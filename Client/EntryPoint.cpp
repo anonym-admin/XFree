@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "D3D12Renderer.h"
 #include "D3D12Mesh.h"
+#include "GeometryGenerator.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -40,29 +41,7 @@ int main(int argc, char* argv[])
 	if (!renderer->Init(hwnd))
 		return -1;
 
-	// Define the geometry for a triangle.
-	Vertex triangleVertices[] =
-	{
-		{ Vector3(0.0f, 0.25f, 0.9f), Vector4(1.0f, 0.0f, 0.0f, 1.0f) },
-		{ Vector3{ 0.25f, -0.25f, 0.9f }, Vector4{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ Vector3{ -0.25f, -0.25f, 0.9f }, Vector4{ 0.0f, 0.0f, 1.0f, 1.0f } }
-	};
-
-	const uint32 vertexBufferSize = sizeof(triangleVertices);
-
-	uint32 triangleIndices[] = { 0, 1, 2 };
-
-	const uint32 indexBufferSize = sizeof(triangleIndices);
-
-	MeshData triangle;
-	triangle.vertices = triangleVertices;
-	triangle.indices = triangleIndices;
-	triangle.verticesSize = sizeof(triangleVertices);
-	triangle.indicesSize = sizeof(triangleIndices);
-	triangle.verticesCount = triangle.verticesSize / sizeof(Vertex);
-	triangle.indicesCount = triangle.indicesSize / sizeof(Index);
-
-	D3D12Mesh* mesh = renderer->CreateMesh(triangle);
+	D3D12Mesh* mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
 
 	MSG msg = { };
 	while (true)

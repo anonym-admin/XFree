@@ -24,6 +24,9 @@ public:
 	void RenderMesh(D3D12Mesh* mesh);
 	void DestroyMesh(D3D12Mesh* mesh);
 
+	inline ID3D12Device* GetDevice() { return m_device; }
+	inline float GetAspectRatio() { return m_aspectRatio; }
+
 private:
 	const static uint32 s_FrameCount = 2;
 

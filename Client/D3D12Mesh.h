@@ -9,6 +9,8 @@ struct ConstBufferData
 	Matrix proj;
 };
 
+class D3D12Renderer;
+
 /*
 ================
 D3D12Mesh
@@ -18,13 +20,13 @@ D3D12Mesh
 class D3D12Mesh
 {
 public:
-	bool Init(ID3D12Device* device, MeshData meshData);
+	bool Init(D3D12Renderer* device, MeshData meshData);
 	void Clean();
 	void Update();
 	void Render(ID3D12GraphicsCommandList* commandList);
 
 private:
-	ID3D12Device* m_device = nullptr;
+	D3D12Renderer* m_renderer = nullptr;
 	ID3D12RootSignature* m_rootSignature = nullptr;
 	ID3D12PipelineState* m_pipelineState = nullptr;
 	// App resources.
@@ -38,8 +40,15 @@ private:
 	ID3D12Resource* m_constBuffer = nullptr;
 	BYTE* m_mappedData = nullptr;
 
+	MeshData m_meshData = {};
+
+	void CreateRootSignature();
+	void CreatePipelineState();
 	void CreateDesciptorHeap();
 	void CreateConstantBuffer();
+
+	void DestroyRootSignature();
+	void DestroyPipelineState();
 	void DestroyDescriptorHeap();
 	void DestroyConstantBuffer();
 };

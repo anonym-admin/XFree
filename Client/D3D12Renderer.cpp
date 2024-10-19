@@ -205,7 +205,7 @@ void D3D12Renderer::Present()
 D3D12Mesh* D3D12Renderer::CreateMesh(MeshData meshData)
 {
 	D3D12Mesh* mesh = new D3D12Mesh;
-	mesh->Init(m_device, meshData);
+	mesh->Init(this, meshData);
 	return mesh;
 }
 
