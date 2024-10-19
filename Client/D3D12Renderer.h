@@ -1,6 +1,6 @@
 #pragma once
 
-#include "D3D12Vertex.h"
+#include "../Common/Vertex.h"
 
 /*
 ==================
@@ -20,13 +20,10 @@ public:
 	void EndRender();
 	void Present();
 
-	D3D12Mesh* CreateMesh(Vertex* vertices, uint32 verticesSize, uint32* indices, uint32 indicesSize);
+	D3D12Mesh* CreateMesh(MeshData meshData);
 	void RenderMesh(D3D12Mesh* mesh);
 	void DestroyMesh(D3D12Mesh* mesh);
 
-	// TEMP
-	ID3D12GraphicsCommandList* GetCommandList() { return m_commandList; }
-	
 private:
 	const static uint32 s_FrameCount = 2;
 
@@ -36,11 +33,14 @@ private:
 	IDXGISwapChain3* m_swapChain = nullptr;
 	ID3D12Device* m_device = nullptr;
 	ID3D12Resource* m_renderTargets[s_FrameCount] = {};
+	ID3D12Resource* m_depthStencilBuffer = nullptr;
 	ID3D12CommandAllocator* m_commandAllocator = nullptr;
 	ID3D12CommandQueue* m_commandQueue = nullptr;
 	ID3D12DescriptorHeap* m_rtvHeap = nullptr;
+	ID3D12DescriptorHeap* m_dsvHeap = nullptr;
 	ID3D12GraphicsCommandList* m_commandList = nullptr;
 	uint32 m_rtvDescriptorSize = 0;
+	uint32 m_dsvDesciptorSize = 0;
 
 	// Synchronization objects.
 	uint32 m_frameIndex = 0;
@@ -51,6 +51,8 @@ private:
 	bool m_useWarpDevice = true;
 	HWND m_hwnd = nullptr;
 
+	float m_screenWidth = 0.0f;
+	float m_screenHeight = 0.0f;
 	float m_aspectRatio = 0.0f;
 
 	void CreateDescriptorHeap();
@@ -58,27 +60,11 @@ private:
 	void CreateCommandAllocatorAndList();
 	void CreateFence();
 
+	void DestroyDesriptorHeap();
+	void DestroyFrameResources();
+	void DestroyCommandAllocatorAndList();
+	void DestroyFence();
+
 	void WaitForPreviousFrame();
 };
 
-/*
-================
-D3D12Mesh
-================
-*/
-
-class D3D12Mesh
-{
-public:
-	bool Init(ID3D12Device* device, Vertex* vertices, uint32 vertexSize, uint32* indices, uint32 indexSize);
-	void Clean();
-	void Update();
-	void Render(ID3D12GraphicsCommandList* commandList);
-
-private:
-	ID3D12Device* m_device = nullptr;
-	ID3D12RootSignature* m_rootSignature = nullptr;
-	ID3D12PipelineState* m_pipelineState = nullptr;
-	// App resources.
-	VertexBuffer* m_vertexBuffer = nullptr;
-};

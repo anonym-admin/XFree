@@ -9,7 +9,7 @@ D3D12Utils
 
 void ThrowIfFailed(HRESULT hr)
 {
-	if (FAILED(hr))
+	if(FAILED(hr))
 	{
 		int32 errorCode = hr;
 		__debugbreak();
@@ -18,7 +18,7 @@ void ThrowIfFailed(HRESULT hr)
 
 namespace D3D12Utils
 {
-	VertexBuffer* CreateVertexBuffer(ID3D12Device* device, void* vertices, uint32 size, uint32 stride)
+	VertexBuffer* CreateVertexBuffer(ID3D12Device* device, void* vertices, uint32 count, uint32 size, uint32 stride)
 	{
 		VertexBuffer* vertexBuffer = new VertexBuffer;
 
@@ -51,7 +51,7 @@ namespace D3D12Utils
 		return vertexBuffer;
 	}
 
-	IndexBuffer* CreateIndexBuffer(ID3D12Device* device, void* indices, uint32 size, DXGI_FORMAT format)
+	IndexBuffer* CreateIndexBuffer(ID3D12Device* device, void* indices, uint32 count, uint32 size, DXGI_FORMAT format)
 	{
 		IndexBuffer* indexBuffer = new IndexBuffer;
 

@@ -18,21 +18,30 @@ using DirectX::SimpleMath::Vector2;
 Vertex
 =======
 */
-
 struct Vertex
 {
 	Vector3 posModel = {};
 	Vector4 color = {};
 };
+/*
+=======
+Index
+=======
+*/
+typedef uint32 Index;
 
-struct VertexBuffer
-{
-	ID3D12Resource* resource = nullptr;
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
-};
+/*
+==========
+Mesh Data
+==========
+*/
 
-struct IndexBuffer
+struct MeshData
 {
-	ID3D12Resource* resource = nullptr;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView = {};
+	Vertex* vertices = nullptr;
+	Index* indices = nullptr;
+	uint32 verticesCount = 0;
+	uint32 indicesCount = 0;
+	uint32 verticesSize = 0;
+	uint32 indicesSize = 0;
 };

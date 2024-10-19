@@ -9,6 +9,10 @@
     <ClCompile Include="D3D12Utils.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="D3D12Mesh.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="GeometryGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -24,9 +28,16 @@
     <ClInclude Include="D3D12Utils.h">
       <Filter>Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="D3D12Vertex.h">
+    <ClInclude Include="D3D12GpuBuffer.h">
       <Filter>Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="D3D12Mesh.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Vertex.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryGenerator.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Common">

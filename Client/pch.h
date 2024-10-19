@@ -30,3 +30,5 @@ Renderer
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+
+#include "D3D12GpuBuffer.h"

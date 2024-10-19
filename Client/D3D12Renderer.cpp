@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "D3D12Renderer.h"
 #include "D3D12Utils.h"
+#include "D3D12Mesh.h"
 
 /*
 ==================
@@ -65,16 +66,16 @@ bool D3D12Renderer::Init(HWND hwnd)
 	RECT rt = {};
 	::GetClientRect(m_hwnd, &rt);
 
-	uint32 screenWidth = static_cast<uint32>(rt.right - rt.left);
-	uint32 screenHeight = static_cast<uint32>(rt.bottom - rt.top);
+	m_screenWidth = static_cast<float>(rt.right - rt.left);
+	m_screenHeight = static_cast<float>(rt.bottom - rt.top);
 
-	m_aspectRatio = static_cast<float>(screenWidth) / screenHeight;
+	m_aspectRatio = m_screenWidth / m_screenHeight;
 
 	// Describe and create the swap chain.
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 	swapChainDesc.BufferCount = s_FrameCount;
-	swapChainDesc.BufferDesc.Width = screenWidth;
-	swapChainDesc.BufferDesc.Height = screenHeight;
+	swapChainDesc.BufferDesc.Width = static_cast<uint32>(m_screenWidth);
+	swapChainDesc.BufferDesc.Height = static_cast<uint32>(m_screenHeight);
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -83,11 +84,7 @@ bool D3D12Renderer::Init(HWND hwnd)
 	swapChainDesc.Windowed = TRUE;
 
 	IDXGISwapChain* swapChain = nullptr;
-	ThrowIfFailed(factory->CreateSwapChain(
-		m_commandQueue,        // Swap chain needs the queue so that it can force a flush on it.
-		&swapChainDesc,
-		&swapChain
-	));
+	ThrowIfFailed(factory->CreateSwapChain(m_commandQueue, &swapChainDesc, &swapChain));
 
 	ThrowIfFailed(swapChain->QueryInterface(IID_PPV_ARGS(&m_swapChain)));
 	swapChain->Release();
@@ -107,15 +104,15 @@ bool D3D12Renderer::Init(HWND hwnd)
 
 	m_viewport.TopLeftX = 0.0f;
 	m_viewport.TopLeftY = 0.0f;
-	m_viewport.Width = static_cast<float>(screenWidth);
-	m_viewport.Height = static_cast<float>(screenHeight);
+	m_viewport.Width = m_screenWidth;
+	m_viewport.Height = m_screenHeight;
 	m_viewport.MinDepth = 0.0f;
 	m_viewport.MaxDepth = 1.0f;
 
 	m_scissorRect.left = 0;
 	m_scissorRect.top = 0;
-	m_scissorRect.right = screenWidth;
-	m_scissorRect.bottom = screenHeight;
+	m_scissorRect.right = static_cast<LONG>(m_screenWidth);
+	m_scissorRect.bottom = static_cast<LONG>(m_screenHeight);
 
 	return true;
 }
@@ -124,44 +121,10 @@ void D3D12Renderer::Clean()
 {
 	WaitForPreviousFrame();
 
-	if (m_fenceEvent)
-	{
-		::CloseHandle(m_fenceEvent);
-		m_fenceEvent = nullptr;
-	}
-
-	if (m_fence)
-	{
-		m_fence->Release();
-		m_fence = nullptr;
-	}
-
-	if (m_commandList)
-	{
-		m_commandList->Release();
-		m_commandList = nullptr;
-	}
-
-	if (m_commandAllocator)
-	{
-		m_commandAllocator->Release();
-		m_commandAllocator = nullptr;
-	}
-
-	for (uint32 i = 0; i < s_FrameCount; i++)
-	{
-		if (m_renderTargets[i])
-		{
-			m_renderTargets[i]->Release();
-			m_renderTargets[i] = nullptr;
-		}
-	}
-
-	if (m_rtvHeap)
-	{
-		m_rtvHeap->Release();
-		m_rtvHeap = nullptr;
-	}
+	DestroyFence();
+	DestroyCommandAllocatorAndList();
+	DestroyFrameResources();
+	DestroyDesriptorHeap();
 
 	if (m_swapChain)
 	{
@@ -210,10 +173,12 @@ void D3D12Renderer::BeginRender()
 	m_commandList->ResourceBarrier(1, &barrier);
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, 1, &dsvHandle);
 
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 }
 
 void D3D12Renderer::EndRender()
@@ -237,14 +202,10 @@ void D3D12Renderer::Present()
 	WaitForPreviousFrame();
 }
 
-D3D12Mesh* D3D12Renderer::CreateMesh(Vertex* vertices, uint32 verticesSize, uint32* indices, uint32 indicesSize)
+D3D12Mesh* D3D12Renderer::CreateMesh(MeshData meshData)
 {
-	// Current, vertice = nullptr !!!
-	// TODO
-
 	D3D12Mesh* mesh = new D3D12Mesh;
-	mesh->Init(m_device, vertices, verticesSize, indices, indicesSize);
-
+	mesh->Init(m_device, meshData);
 	return mesh;
 }
 
@@ -265,7 +226,6 @@ void D3D12Renderer::DestroyMesh(D3D12Mesh* mesh)
 
 void D3D12Renderer::CreateDescriptorHeap()
 {
-	// Describe and create a render target view (RTV) descriptor heap.
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
 	rtvHeapDesc.NumDescriptors = s_FrameCount;
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -273,6 +233,15 @@ void D3D12Renderer::CreateDescriptorHeap()
 	ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
 	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	dsvHeapDesc.NodeMask = 0;
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
+
+	m_dsvDesciptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 }
 
 void D3D12Renderer::CreateFrameResources()
@@ -286,8 +255,36 @@ void D3D12Renderer::CreateFrameResources()
 		m_device->CreateRenderTargetView(m_renderTargets[n], nullptr, rtvHandle);
 		rtvHandle.Offset(1, m_rtvDescriptorSize);
 	}
-}
 
+	// Create a DSV
+	D3D12_RESOURCE_DESC depthStencilDesc;
+	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	depthStencilDesc.Alignment = 0;
+	depthStencilDesc.Width = static_cast<uint64>(m_screenWidth);
+	depthStencilDesc.Height = static_cast<uint64>(m_screenHeight);
+	depthStencilDesc.DepthOrArraySize = 1;
+	depthStencilDesc.MipLevels = 1;
+	depthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+	depthStencilDesc.SampleDesc.Count = 1;
+	depthStencilDesc.SampleDesc.Quality = 0;
+	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+	D3D12_CLEAR_VALUE optClear;
+	optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	optClear.DepthStencil.Depth = 1.0f;
+	optClear.DepthStencil.Stencil = 0;
+	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &depthStencilDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &optClear, IID_PPV_ARGS(&m_depthStencilBuffer)));
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dsvDesc.Texture2D.MipSlice = 0;
+	m_device->CreateDepthStencilView(m_depthStencilBuffer, &dsvDesc, dsvHandle);
+}
 
 void D3D12Renderer::CreateCommandAllocatorAndList()
 {
@@ -311,6 +308,69 @@ void D3D12Renderer::CreateFence()
 	}
 }
 
+void D3D12Renderer::DestroyDesriptorHeap()
+{
+	if (m_dsvHeap)
+	{
+		m_dsvHeap->Release();
+		m_dsvHeap = nullptr;
+	}
+
+	if (m_rtvHeap)
+	{
+		m_rtvHeap->Release();
+		m_rtvHeap = nullptr;
+	}
+}
+
+void D3D12Renderer::DestroyFrameResources()
+{
+	if (m_depthStencilBuffer)
+	{
+		m_depthStencilBuffer->Release();
+		m_depthStencilBuffer = nullptr;
+	}
+
+	for (uint32 i = 0; i < s_FrameCount; i++)
+	{
+		if (m_renderTargets[i])
+		{
+			m_renderTargets[i]->Release();
+			m_renderTargets[i] = nullptr;
+		}
+	}
+}
+
+void D3D12Renderer::DestroyCommandAllocatorAndList()
+{
+	if (m_commandList)
+	{
+		m_commandList->Release();
+		m_commandList = nullptr;
+	}
+
+	if (m_commandAllocator)
+	{
+		m_commandAllocator->Release();
+		m_commandAllocator = nullptr;
+	}
+}
+
+void D3D12Renderer::DestroyFence()
+{
+	if (m_fenceEvent)
+	{
+		::CloseHandle(m_fenceEvent);
+		m_fenceEvent = nullptr;
+	}
+
+	if (m_fence)
+	{
+		m_fence->Release();
+		m_fence = nullptr;
+	}
+}
+
 void D3D12Renderer::WaitForPreviousFrame()
 {
 	uint64 curFenceValue = m_fenceValue++;
@@ -323,131 +383,4 @@ void D3D12Renderer::WaitForPreviousFrame()
 	}
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-}
-
-/*
-================
-D3D12Mesh
-================
-*/
-
-bool D3D12Mesh::Init(ID3D12Device* device, Vertex* vertices, uint32 vertexSize, uint32* indices, uint32 indexSize)
-{
-	m_device = device;
-
-	// Create an empty root signature.
-	{
-		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		ID3DBlob* signature = nullptr;
-		ID3DBlob* error = nullptr;
-		ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-		ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-
-		if (signature)
-		{
-			signature->Release();
-			signature = nullptr;
-		}
-		if (error)
-		{
-			error->Release();
-			error = nullptr;
-		}
-	}
-
-	// Create the pipeline state, which includes compiling and loading shaders.
-	{
-		ID3DBlob* vertexShader = nullptr;
-		ID3DBlob* pixelShader = nullptr;
-
-#if defined(_DEBUG)
-		// Enable better shader debugging with the graphics debugging tools.
-		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-		UINT compileFlags = 0;
-#endif
-		ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-		ThrowIfFailed(D3DCompileFromFile(L"shaders.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
-
-		// Define the vertex input layout.
-		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-		};
-
-		// Describe and create the graphics pipeline state object (PSO).
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-		psoDesc.pRootSignature = m_rootSignature;
-		psoDesc.VS = { reinterpret_cast<UINT8*>(vertexShader->GetBufferPointer()), vertexShader->GetBufferSize() };
-		psoDesc.PS = { reinterpret_cast<UINT8*>(pixelShader->GetBufferPointer()), pixelShader->GetBufferSize() };
-		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState.DepthEnable = FALSE;
-		psoDesc.DepthStencilState.StencilEnable = FALSE;
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.SampleDesc.Count = 1;
-		ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
-
-		if (vertexShader)
-		{
-			vertexShader->Release();
-			vertexShader = nullptr;
-		}
-
-		if (pixelShader)
-		{
-			pixelShader->Release();
-			pixelShader = nullptr;
-		}
-	}
-
-	// Create the vertex buffer.
-	m_vertexBuffer = D3D12Utils::CreateVertexBuffer(m_device, vertices, vertexSize, sizeof(Vertex));
-
-	return true;
-}
-
-void D3D12Mesh::Clean()
-{
-	if (m_vertexBuffer)
-	{
-		m_vertexBuffer->resource->Release();
-		m_vertexBuffer->resource = nullptr;
-		
-		delete m_vertexBuffer;
-		m_vertexBuffer = nullptr;
-	}
-
-	if (m_pipelineState)
-	{
-		m_pipelineState->Release();
-		m_pipelineState = nullptr;
-	}
-
-	if (m_rootSignature)
-	{
-		m_rootSignature->Release();
-		m_rootSignature = nullptr;
-	}
-}
-
-void D3D12Mesh::Update()
-{
-}
-
-void D3D12Mesh::Render(ID3D12GraphicsCommandList* commandList)
-{
-	commandList->SetGraphicsRootSignature(m_rootSignature);
-	commandList->SetPipelineState(m_pipelineState);
-	// Record commands.
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->vertexBufferView);
-	commandList->DrawInstanced(3, 1, 0, 0);
 }
