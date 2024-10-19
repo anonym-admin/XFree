@@ -53,17 +53,8 @@ void D3D12Mesh::Clean()
 		m_vertexBuffer = nullptr;
 	}
 
-	if (m_pipelineState)
-	{
-		m_pipelineState->Release();
-		m_pipelineState = nullptr;
-	}
-
-	if (m_rootSignature)
-	{
-		m_rootSignature->Release();
-		m_rootSignature = nullptr;
-	}
+	DestroyPipelineState();
+	DestroyRootSignature();
 
 	// TODO
 	if (m_meshData.vertices)
@@ -233,10 +224,20 @@ void D3D12Mesh::CreateConstantBuffer()
 
 void D3D12Mesh::DestroyRootSignature()
 {
+	if (m_rootSignature)
+	{
+		m_rootSignature->Release();
+		m_rootSignature = nullptr;
+	}
 }
 
 void D3D12Mesh::DestroyPipelineState()
 {
+	if (m_pipelineState)
+	{
+		m_pipelineState->Release();
+		m_pipelineState = nullptr;
+	}
 }
 
 void D3D12Mesh::DestroyDescriptorHeap()

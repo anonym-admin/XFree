@@ -77,6 +77,7 @@ namespace GeometryGenerator
 		MeshData meshData = {};
 
 		Vertex squareVertices[24] = {};
+
 		squareVertices[0].posModel	= Vector3(-1.0f, 1.0f, -1.0f) * scale;
 		squareVertices[1].posModel	= Vector3(-1.0f, 1.0f, 1.0f) * scale;
 		squareVertices[2].posModel	= Vector3(1.0f, 1.0f, 1.0f) * scale;
@@ -142,12 +143,12 @@ namespace GeometryGenerator
 		::memcpy(meshData.vertices, squareVertices, sizeof(Vertex) * count);
 
 		uint32 squareIndices[] = {
-					0,  1,  2,  0,  2,  3,  // À­¸é
-					4,  5,  6,  4,  6,  7,  // ¾Æ·§¸é
-					8,  9,  10, 8,  10, 11, // ¾Õ¸é
-					12, 13, 14, 12, 14, 15, // µÞ¸é
-					16, 17, 18, 16, 18, 19, // ¿ÞÂÊ
-					20, 21, 22, 20, 22, 23  // ¿À¸¥ÂÊ
+				0,  1,  2,  0,  2,  3,  // À­¸é
+				4,  5,  6,  4,  6,  7,  // ¾Æ·§¸é
+				8,  9,  10, 8,  10, 11, // ¾Õ¸é
+				12, 13, 14, 12, 14, 15, // µÞ¸é
+				16, 17, 18, 16, 18, 19, // ¿ÞÂÊ
+				20, 21, 22, 20, 22, 23  // ¿À¸¥ÂÊ
 		};
 
 		size = sizeof(squareIndices);
