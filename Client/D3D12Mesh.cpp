@@ -14,8 +14,15 @@ bool D3D12Mesh::Init(ID3D12Device* device, MeshData meshData)
 
 	// Create an empty root signature.
 	{
+		// Create a single descriptor table of CBVs.
+		CD3DX12_DESCRIPTOR_RANGE cbvTable;
+		cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+		// Root parameter can be a table, root descriptor or root constants.
+		CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+		slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		rootSignatureDesc.Init(_countof(slotRootParameter), slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		ID3DBlob* signature = nullptr;
 		ID3DBlob* error = nullptr;
@@ -89,11 +96,18 @@ bool D3D12Mesh::Init(ID3D12Device* device, MeshData meshData)
 	m_vertexBuffer = D3D12Utils::CreateVertexBuffer(m_device, meshData.vertices, meshData.verticesCount, meshData.verticesSize, sizeof(Vertex));
 	m_indexBuffer = D3D12Utils::CreateIndexBuffer(m_device, meshData.indices, meshData.indicesCount, meshData.indicesSize, DXGI_FORMAT_R32_UINT);
 
+	// Create const buffer.
+	CreateDesciptorHeap();
+	CreateConstantBuffer();
+
 	return true;
 }
 
 void D3D12Mesh::Clean()
 {
+	DestroyConstantBuffer();
+	DestroyDescriptorHeap();
+
 	if (m_indexBuffer)
 	{
 		m_indexBuffer->resource->Release();
@@ -127,14 +141,80 @@ void D3D12Mesh::Clean()
 
 void D3D12Mesh::Update()
 {
+	m_constData.world = Matrix();
+	m_constData.view = DirectX::XMMatrixLookToLH(Vector3(0.0f, 0.0f, -1.0f), Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 1.0f, 0.0f));
+	m_constData.proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(70.0f), 1.7f, 0.1f, 100.0f);
+
+	::memcpy(m_mappedData, &m_constData, sizeof(ConstBufferData));
 }
 
 void D3D12Mesh::Render(ID3D12GraphicsCommandList* commandList)
 {
 	commandList->SetGraphicsRootSignature(m_rootSignature);
 	commandList->SetPipelineState(m_pipelineState);
+	commandList->SetDescriptorHeaps(1, &m_cbvHeap);
+	commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 	// Record commands.
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->vertexBufferView);
 	commandList->DrawInstanced(3, 1, 0, 0);
+}
+
+void D3D12Mesh::CreateDesciptorHeap()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+	rtvHeapDesc.NumDescriptors = 1;
+	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+
+	m_cbvsrvDesciptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+}
+
+void D3D12Mesh::CreateConstantBuffer()
+{
+	uint32 bufferCount = 1;
+	uint32 bufferSize = D3D12Utils::CalcConstantBufferByteSize(sizeof(ConstBufferData));
+	ThrowIfFailed(m_device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(bufferSize * bufferCount),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&m_constBuffer)));
+
+	ThrowIfFailed(m_constBuffer->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedData)));
+
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddress = m_constBuffer->GetGPUVirtualAddress();
+	// Offset to the ith object constant buffer in the buffer.
+	int32 boxCBufIndex = 0;
+	cbAddress += boxCBufIndex * bufferSize;
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+	cbvDesc.BufferLocation = cbAddress;
+	cbvDesc.SizeInBytes = bufferSize;
+
+	m_device->CreateConstantBufferView(
+		&cbvDesc,
+		m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
+void D3D12Mesh::DestroyDescriptorHeap()
+{
+	if (m_cbvHeap)
+	{
+		m_cbvHeap->Release();
+		m_cbvHeap = nullptr;
+	}
+}
+
+void D3D12Mesh::DestroyConstantBuffer()
+{
+	if (m_constBuffer)
+	{
+		m_constBuffer->Unmap(0, nullptr);
+
+		m_constBuffer->Release();
+		m_constBuffer = nullptr;
+	}
 }

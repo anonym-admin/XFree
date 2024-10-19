@@ -2,6 +2,13 @@
 
 #include "../Common/Vertex.h"
 
+struct ConstBufferData
+{
+	Matrix world;
+	Matrix view;
+	Matrix proj;
+};
+
 /*
 ================
 D3D12Mesh
@@ -23,4 +30,16 @@ private:
 	// App resources.
 	VertexBuffer* m_vertexBuffer = nullptr;
 	IndexBuffer* m_indexBuffer = nullptr;
+
+	ID3D12DescriptorHeap* m_cbvHeap = nullptr;
+	uint32 m_cbvsrvDesciptorSize = 0;
+
+	ConstBufferData m_constData = {};
+	ID3D12Resource* m_constBuffer = nullptr;
+	BYTE* m_mappedData = nullptr;
+
+	void CreateDesciptorHeap();
+	void CreateConstantBuffer();
+	void DestroyDescriptorHeap();
+	void DestroyConstantBuffer();
 };

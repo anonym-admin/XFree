@@ -1,3 +1,10 @@
+cbuffer ConstBuffer : register(b0)
+{
+	matrix world;
+	matrix view;
+	matrix proj;
+};
+
 struct VSInput
 {
 	float3 posModel : POSITION;
@@ -13,7 +20,12 @@ struct PSInput
 PSInput VSMain(VSInput input)
 {
 	PSInput output;
-	output.posProj = float4(input.posModel, 1.0);
+	
+	float4 pos = float4(input.posModel, 1.0);
+	pos = mul(world, pos);
+	pos = mul(view, pos);
+	pos = mul(proj, pos);
+	output.posProj = pos;
 	output.color = input.color;
 	return output;
 }

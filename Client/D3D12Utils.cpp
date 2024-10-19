@@ -83,4 +83,9 @@ namespace D3D12Utils
 
 		return indexBuffer;
 	}
+
+	uint32 CalcConstantBufferByteSize(uint32 size)
+	{
+		return (size + 255) & ~255;
+	}
 }
