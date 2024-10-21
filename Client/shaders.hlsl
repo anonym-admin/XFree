@@ -22,11 +22,14 @@ PSInput VSMain(VSInput input)
 	PSInput output;
 	
 	float4 pos = float4(input.posModel, 1.0);
-	pos = mul(world, pos);
-	pos = mul(view, pos);
-	pos = mul(proj, pos);
+
+	pos = mul(pos, world);
+	pos = mul(pos, view);
+	pos = mul(pos, proj);
+
 	output.posProj = pos;
 	output.color = input.color;
+
 	return output;
 }
 

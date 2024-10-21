@@ -3,6 +3,8 @@
 #include "D3D12Mesh.h"
 #include "GeometryGenerator.h"
 
+#include "../../Gen/LinkedList.h"
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 /*
@@ -41,7 +43,20 @@ int main(int argc, char* argv[])
 	if (!renderer->Init(hwnd))
 		return -1;
 
+	xlist* list = nullptr;
+	xlist_init(&list);
+
 	D3D12Mesh* mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	mesh->UpdateWorldMatrix(Matrix::CreateRotationY(DirectX::XM_PIDIV4) * Matrix::CreateTranslation(Vector3(0.0f, 0.2f, 0.0f)));
+	xlist_insert(list, mesh);
+
+	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	mesh->UpdateWorldMatrix(Matrix::CreateTranslation(Vector3(-0.5f, 0.0f, 0.0f)));
+	xlist_insert(list, mesh);
+
+	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	mesh->UpdateWorldMatrix(Matrix::CreateTranslation(Vector3(0.5f, 0.0f, 0.0f)));
+	xlist_insert(list, mesh);
 
 	MSG msg = { };
 	while (true)
@@ -59,18 +74,39 @@ int main(int argc, char* argv[])
 		else
 		{
 			renderer->Update();
-			mesh->Update();
+
+			while (true)
+			{
+				void* iter = xlist_iter(list);
+				if (iter == nullptr)
+					break;
+				((D3D12Mesh*)(xlist_get_data(iter)))->Update();
+			}
 
 			renderer->BeginRender();
 
-			renderer->RenderMesh(mesh);
+			while (true)
+			{
+				void* iter = xlist_iter(list);
+				if (iter == nullptr)
+					break;
+				renderer->RenderMesh((D3D12Mesh*)xlist_get_data(iter));
+			}
 			
 			renderer->EndRender();
 			renderer->Present();
 		}
 	}
 
-	renderer->DestroyMesh(mesh);
+	while (true)
+	{
+		void* iter = xlist_iter(list);
+		if (iter == nullptr)
+			break;
+		renderer->DestroyMesh((D3D12Mesh*)xlist_get_data(iter));
+	}
+
+	xlist_clean(list);
 
 	renderer->Clean();
 	delete renderer;

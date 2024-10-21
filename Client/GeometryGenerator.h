@@ -2,6 +2,12 @@
 
 #include "../Common/Vertex.h"
 
+/*
+==================
+GeometryGenerator.
+==================
+*/
+
 namespace GeometryGenerator
 {
 	MeshData MakeTriangle();

@@ -1,6 +1,12 @@
 #include "pch.h"
 #include "GeometryGenerator.h"
 
+/*
+==================
+GeometryGenerator.
+==================
+*/
+
 namespace GeometryGenerator
 {
 	MeshData MakeTriangle()

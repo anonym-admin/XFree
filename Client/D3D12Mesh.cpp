@@ -5,9 +5,13 @@
 
 /*
 ================
-D3D12Mesh
+D3D12Mesh.
 ================
 */
+
+uint32 D3D12Mesh::sm_refCount = 0;
+ID3D12RootSignature* D3D12Mesh::sm_rootSignature = nullptr;
+ID3D12PipelineState* D3D12Mesh::sm_pipelineState = nullptr;
 
 bool D3D12Mesh::Init(D3D12Renderer* renderer, MeshData meshData)
 {
@@ -16,8 +20,11 @@ bool D3D12Mesh::Init(D3D12Renderer* renderer, MeshData meshData)
 
 	ID3D12Device* device = m_renderer->GetDevice();
 
-	CreateRootSignature();
-	CreatePipelineState();
+	if (sm_refCount == 0)
+	{
+		CreateRootSignature();
+		CreatePipelineState();
+	}
 
 	// Create buffers.
 	m_vertexBuffer = D3D12Utils::CreateVertexBuffer(device, meshData.vertices, meshData.verticesCount, meshData.verticesSize, sizeof(Vertex));
@@ -27,11 +34,19 @@ bool D3D12Mesh::Init(D3D12Renderer* renderer, MeshData meshData)
 	CreateDesciptorHeap();
 	CreateConstantBuffer();
 
+	sm_refCount++;
+
 	return true;
 }
 
 void D3D12Mesh::Clean()
 {
+	uint32 refCount = --sm_refCount;
+	if (refCount != 0)
+	{
+		return;
+	}
+
 	DestroyConstantBuffer();
 	DestroyDescriptorHeap();
 
@@ -70,22 +85,29 @@ void D3D12Mesh::Clean()
 	}
 }
 
+void D3D12Mesh::UpdateWorldMatrix(Matrix worldRow)
+{
+	m_worldRow = worldRow;
+}
+
 void D3D12Mesh::Update()
 {
-	static float dt = 0.0f;
-	dt += 1.0f / 30.0f;
-
-	m_constData.world = Matrix::CreateRotationY(dt);
+	m_constData.world = m_worldRow;
+	m_constData.world = m_constData.world.Transpose();
 	m_constData.view = DirectX::XMMatrixLookToLH(Vector3(0.0f, 0.0f, -1.0f), Vector3(0.0f, 0.0f, 1.0f), Vector3(0.0f, 1.0f, 0.0f));
+	m_constData.view = m_constData.view.Transpose();
 	m_constData.proj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(70.0f), m_renderer->GetAspectRatio(), 0.1f, 100.0f);
+	m_constData.proj = m_constData.proj.Transpose();
 
-	::memcpy(m_mappedData, &m_constData, sizeof(ConstBufferData));
+	uint32 bufferSize = D3D12Utils::CalcConstantBufferByteSize(sizeof(ConstBufferData));
+
+	::memcpy(m_mappedData, &m_constData, bufferSize);
 }
 
 void D3D12Mesh::Render(ID3D12GraphicsCommandList* commandList)
 {
-	commandList->SetGraphicsRootSignature(m_rootSignature);
-	commandList->SetPipelineState(m_pipelineState);
+	commandList->SetGraphicsRootSignature(sm_rootSignature);
+	commandList->SetPipelineState(sm_pipelineState);
 	commandList->SetDescriptorHeaps(1, &m_cbvHeap);
 	commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 	// Record commands.
@@ -112,7 +134,7 @@ void D3D12Mesh::CreateRootSignature()
 	ID3DBlob* signature = nullptr;
 	ID3DBlob* error = nullptr;
 	ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-	ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+	ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sm_rootSignature)));
 
 	if (signature)
 	{
@@ -152,7 +174,7 @@ void D3D12Mesh::CreatePipelineState()
 	// Describe and create the graphics pipeline state object (PSO).
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-	psoDesc.pRootSignature = m_rootSignature;
+	psoDesc.pRootSignature = sm_rootSignature;
 	psoDesc.VS = { reinterpret_cast<UINT8*>(vertexShader->GetBufferPointer()), vertexShader->GetBufferSize() };
 	psoDesc.PS = { reinterpret_cast<UINT8*>(pixelShader->GetBufferPointer()), pixelShader->GetBufferSize() };
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -164,7 +186,7 @@ void D3D12Mesh::CreatePipelineState()
 	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	psoDesc.SampleDesc.Count = 1;
-	ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+	ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&sm_pipelineState)));
 
 	if (vertexShader)
 	{
@@ -198,6 +220,7 @@ void D3D12Mesh::CreateConstantBuffer()
 
 	uint32 bufferCount = 1;
 	uint32 bufferSize = D3D12Utils::CalcConstantBufferByteSize(sizeof(ConstBufferData));
+
 	ThrowIfFailed(device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
@@ -224,19 +247,19 @@ void D3D12Mesh::CreateConstantBuffer()
 
 void D3D12Mesh::DestroyRootSignature()
 {
-	if (m_rootSignature)
+	if (sm_rootSignature)
 	{
-		m_rootSignature->Release();
-		m_rootSignature = nullptr;
+		sm_rootSignature->Release();
+		sm_rootSignature = nullptr;
 	}
 }
 
 void D3D12Mesh::DestroyPipelineState()
 {
-	if (m_pipelineState)
+	if (sm_pipelineState)
 	{
-		m_pipelineState->Release();
-		m_pipelineState = nullptr;
+		sm_pipelineState->Release();
+		sm_pipelineState = nullptr;
 	}
 }
 

@@ -13,7 +13,7 @@ class D3D12Renderer;
 
 /*
 ================
-D3D12Mesh
+D3D12Mesh.
 ================
 */
 
@@ -22,13 +22,16 @@ class D3D12Mesh
 public:
 	bool Init(D3D12Renderer* device, MeshData meshData);
 	void Clean();
+	void UpdateWorldMatrix(Matrix worldRow);
 	void Update();
 	void Render(ID3D12GraphicsCommandList* commandList);
 
 private:
+	static uint32 sm_refCount;
+	static ID3D12RootSignature* sm_rootSignature;
+	static ID3D12PipelineState* sm_pipelineState;
+
 	D3D12Renderer* m_renderer = nullptr;
-	ID3D12RootSignature* m_rootSignature = nullptr;
-	ID3D12PipelineState* m_pipelineState = nullptr;
 	// App resources.
 	VertexBuffer* m_vertexBuffer = nullptr;
 	IndexBuffer* m_indexBuffer = nullptr;
@@ -41,6 +44,8 @@ private:
 	BYTE* m_mappedData = nullptr;
 
 	MeshData m_meshData = {};
+
+	Matrix m_worldRow = Matrix();
 
 	void CreateRootSignature();
 	void CreatePipelineState();
