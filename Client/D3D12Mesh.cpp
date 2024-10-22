@@ -33,6 +33,8 @@ bool D3D12Mesh::Init(D3D12Renderer* renderer, MeshData meshData)
 	// Create const buffer.
 	CreateDesciptorHeap();
 	CreateConstantBuffer();
+	// Create texture.
+	CreateTextureResource();
 
 	sm_refCount++;
 
@@ -41,17 +43,15 @@ bool D3D12Mesh::Init(D3D12Renderer* renderer, MeshData meshData)
 
 void D3D12Mesh::Clean()
 {
-	uint32 refCount = --sm_refCount;
-	if (refCount != 0)
-	{
-		return;
-	}
-
+	DestroyTextureResource();
 	DestroyConstantBuffer();
 	DestroyDescriptorHeap();
 
 	if (m_indexBuffer)
 	{
+		m_indexBuffer->upload->Release();
+		m_indexBuffer->upload = nullptr;
+
 		m_indexBuffer->resource->Release();
 		m_indexBuffer->resource = nullptr;
 
@@ -61,6 +61,9 @@ void D3D12Mesh::Clean()
 
 	if (m_vertexBuffer)
 	{
+		m_vertexBuffer->upload->Release();
+		m_vertexBuffer->upload = nullptr;
+
 		m_vertexBuffer->resource->Release();
 		m_vertexBuffer->resource = nullptr;
 
@@ -68,8 +71,13 @@ void D3D12Mesh::Clean()
 		m_vertexBuffer = nullptr;
 	}
 
-	DestroyPipelineState();
-	DestroyRootSignature();
+	uint32 refCount = --sm_refCount;
+
+	if (refCount == 0)
+	{
+		DestroyPipelineState();
+		DestroyRootSignature();
+	}
 
 	// TODO
 	if (m_meshData.vertices)
@@ -122,14 +130,17 @@ void D3D12Mesh::CreateRootSignature()
 	ID3D12Device* device = m_renderer->GetDevice();
 
 	// Create a single descriptor table of CBVs.
-	CD3DX12_DESCRIPTOR_RANGE cbvTable;
-	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE cbvTable[2];
+	cbvTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	cbvTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	// Root parameter can be a table, root descriptor or root constants.
 	CD3DX12_ROOT_PARAMETER slotRootParameter[1];
-	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
+	slotRootParameter[0].InitAsDescriptorTable(_countof(cbvTable), cbvTable);
+
+	CD3DX12_STATIC_SAMPLER_DESC linearClamp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-	rootSignatureDesc.Init(_countof(slotRootParameter), slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	rootSignatureDesc.Init(_countof(slotRootParameter), slotRootParameter, 1, &linearClamp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ID3DBlob* signature = nullptr;
 	ID3DBlob* error = nullptr;
@@ -168,7 +179,8 @@ void D3D12Mesh::CreatePipelineState()
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 
 	// Describe and create the graphics pipeline state object (PSO).
@@ -205,11 +217,11 @@ void D3D12Mesh::CreateDesciptorHeap()
 {
 	ID3D12Device* device = m_renderer->GetDevice();
 
-	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-	rtvHeapDesc.NumDescriptors = 1;
-	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+	D3D12_DESCRIPTOR_HEAP_DESC cbvsrvHeapDesc = {};
+	cbvsrvHeapDesc.NumDescriptors = 2;
+	cbvsrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	cbvsrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	ThrowIfFailed(device->CreateDescriptorHeap(&cbvsrvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
 
 	m_cbvsrvDesciptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
@@ -240,9 +252,7 @@ void D3D12Mesh::CreateConstantBuffer()
 	cbvDesc.BufferLocation = cbAddress;
 	cbvDesc.SizeInBytes = bufferSize;
 
-	device->CreateConstantBufferView(
-		&cbvDesc,
-		m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
+	device->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void D3D12Mesh::DestroyRootSignature()
@@ -272,6 +282,14 @@ void D3D12Mesh::DestroyDescriptorHeap()
 	}
 }
 
+void D3D12Mesh::CreateTextureResource()
+{
+	ID3D12Device* device = m_renderer->GetDevice();
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_cbvHeap->GetCPUDescriptorHandleForHeapStart(), m_cbvsrvDesciptorSize);
+	m_textureHandle = D3D12Utils::CreateTexture2D(device, L"../Assets/WoodCrate01.dds", srvHandle);
+}
+
 void D3D12Mesh::DestroyConstantBuffer()
 {
 	if (m_constBuffer)
@@ -280,5 +298,20 @@ void D3D12Mesh::DestroyConstantBuffer()
 
 		m_constBuffer->Release();
 		m_constBuffer = nullptr;
+	}
+}
+
+void D3D12Mesh::DestroyTextureResource()
+{
+	if (m_textureHandle)
+	{
+		if (m_textureHandle->resource)
+		{
+			m_textureHandle->resource->Release();
+			m_textureHandle->resource = nullptr;
+		}
+
+		delete m_textureHandle;
+		m_textureHandle = nullptr;
 	}
 }

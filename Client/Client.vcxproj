@@ -147,6 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="D3D12CommandList.cpp" />
     <ClCompile Include="D3D12Mesh.cpp" />
     <ClCompile Include="D3D12Renderer.cpp" />
     <ClCompile Include="D3D12Utils.cpp" />
@@ -166,6 +167,7 @@
   <ItemGroup>
     <ClInclude Include="..\Common\Types.h" />
     <ClInclude Include="..\Common\Vertex.h" />
+    <ClInclude Include="D3D12CommandList.h" />
     <ClInclude Include="D3D12GpuBuffer.h" />
     <ClInclude Include="D3D12Mesh.h" />
     <ClInclude Include="D3D12Renderer.h" />

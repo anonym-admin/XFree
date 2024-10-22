@@ -9,6 +9,7 @@ struct ConstBufferData
 	Matrix proj;
 };
 
+struct TextureHandle;
 class D3D12Renderer;
 
 /*
@@ -47,13 +48,17 @@ private:
 
 	Matrix m_worldRow = Matrix();
 
+	TextureHandle* m_textureHandle = nullptr;
+
 	void CreateRootSignature();
 	void CreatePipelineState();
 	void CreateDesciptorHeap();
 	void CreateConstantBuffer();
+	void CreateTextureResource();
 
 	void DestroyRootSignature();
 	void DestroyPipelineState();
 	void DestroyDescriptorHeap();
 	void DestroyConstantBuffer();
+	void DestroyTextureResource();
 };

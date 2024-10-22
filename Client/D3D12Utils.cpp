@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "D3D12Utils.h"
+#include "D3D12CommandList.h"
+#include <directxtk12/DDSTextureLoader.h>
+#include <directxtk12/ResourceUploadBatch.h>
 
 /*
 ================
@@ -22,26 +25,35 @@ namespace D3D12Utils
 	{
 		VertexBuffer* vertexBuffer = new VertexBuffer;
 
-		// Note: using upload heaps to transfer static data like vert buffers is not 
-		// recommended. Every time the GPU needs it, the upload heap will be marshalled 
-		// over. Please read up on Default Heap usage. An upload heap is used here for 
-		// code simplicity and because there are very few verts to actually transfer.
-		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
 		auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&desc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&vertexBuffer->resource)));
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&vertexBuffer->resource)));
 
-		// Copy the triangle data to the vertex buffer.
-		UINT8* pVertexDataBegin;
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		ThrowIfFailed(vertexBuffer->resource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-		memcpy(pVertexDataBegin, vertices, size);
-		vertexBuffer->resource->Unmap(0, nullptr);
+		heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps,D3D12_HEAP_FLAG_NONE,&desc,D3D12_RESOURCE_STATE_GENERIC_READ,nullptr,IID_PPV_ARGS(&vertexBuffer->upload)));
+
+		// Describe the data we want to copy into the default buffer.
+		D3D12_SUBRESOURCE_DATA subResourceData = {};
+		subResourceData.pData = vertices;
+		subResourceData.RowPitch = size;
+		subResourceData.SlicePitch = subResourceData.RowPitch;
+
+		// TODO
+		D3D12CommandList* ctx = new D3D12CommandList;
+		ctx->Init(device);
+		ctx->Reset();
+
+		ctx->m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer->resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		UpdateSubresources<1>(ctx->m_commandList, vertexBuffer->resource, vertexBuffer->upload, 0, 0, 1, &subResourceData);
+		ctx->m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		ctx->ExcuteCommandLists();
+		ctx->WaitForGpu();
+		ctx->Clean();
+
+		delete ctx;
+		ctx = nullptr;
 
 		// Initialize the vertex buffer view.
 		vertexBuffer->vertexBufferView.BufferLocation = vertexBuffer->resource->GetGPUVirtualAddress();
@@ -55,26 +67,35 @@ namespace D3D12Utils
 	{
 		IndexBuffer* indexBuffer = new IndexBuffer;
 
-		// Note: using upload heaps to transfer static data like vert buffers is not 
-		// recommended. Every time the GPU needs it, the upload heap will be marshalled 
-		// over. Please read up on Default Heap usage. An upload heap is used here for 
-		// code simplicity and because there are very few verts to actually transfer.
-		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
 		auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&desc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&indexBuffer->resource)));
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&indexBuffer->resource)));
 
-		// Copy the triangle data to the vertex buffer.
-		UINT8* pVertexDataBegin;
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		ThrowIfFailed(indexBuffer->resource->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-		memcpy(pVertexDataBegin, indices, size);
-		indexBuffer->resource->Unmap(0, nullptr);
+		heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&indexBuffer->upload)));
+
+		// Describe the data we want to copy into the default buffer.
+		D3D12_SUBRESOURCE_DATA subResourceData = {};
+		subResourceData.pData = indices;
+		subResourceData.RowPitch = size;
+		subResourceData.SlicePitch = subResourceData.RowPitch;
+
+		// TODO
+		D3D12CommandList* ctx = new D3D12CommandList;
+		ctx->Init(device);
+		ctx->Reset();
+
+		ctx->m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer->resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		UpdateSubresources<1>(ctx->m_commandList, indexBuffer->resource, indexBuffer->upload, 0, 0, 1, &subResourceData);
+		ctx->m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer->resource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		ctx->ExcuteCommandLists();
+		ctx->WaitForGpu();
+		ctx->Clean();
+
+		delete ctx;
+		ctx = nullptr;
 
 		// Initialize the vertex buffer view.
 		indexBuffer->indexBufferView.BufferLocation = indexBuffer->resource->GetGPUVirtualAddress();
@@ -82,6 +103,42 @@ namespace D3D12Utils
 		indexBuffer->indexBufferView.SizeInBytes = size;
 
 		return indexBuffer;
+	}
+
+	TextureHandle* CreateTexture2D(ID3D12Device* device, const wchar_t* filename, D3D12_CPU_DESCRIPTOR_HANDLE srvHandle)
+	{
+		using namespace DirectX;
+
+		// TODO
+		D3D12CommandList* ctx = new D3D12CommandList;
+		ctx->Init(device);
+
+		TextureHandle* textureHandle = new TextureHandle;
+		ResourceUploadBatch resourceUpload(device);
+		resourceUpload.Begin();
+
+		ThrowIfFailed(CreateDDSTextureFromFile(device, resourceUpload, filename, &textureHandle->resource));
+
+		auto uploadResourcesFinished = resourceUpload.End(ctx->m_commandQueue);
+
+		uploadResourcesFinished.wait();
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = textureHandle->resource->GetDesc().Format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+		srvDesc.Texture2D.MipLevels = textureHandle->resource->GetDesc().MipLevels;
+		srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+		device->CreateShaderResourceView(textureHandle->resource, &srvDesc, srvHandle);
+		textureHandle->srvHandle = srvHandle;
+
+		ctx->Clean();
+		delete ctx;
+		ctx = nullptr;
+
+		return textureHandle;
 	}
 
 	uint32 CalcConstantBufferByteSize(uint32 size)

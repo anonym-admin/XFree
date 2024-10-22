@@ -13,6 +13,9 @@
       <Filter>Renderer</Filter>
     </ClCompile>
     <ClCompile Include="GeometryGenerator.cpp" />
+    <ClCompile Include="D3D12CommandList.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -38,6 +41,9 @@
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="D3D12CommandList.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Common">

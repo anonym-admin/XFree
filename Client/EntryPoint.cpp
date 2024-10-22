@@ -46,15 +46,15 @@ int main(int argc, char* argv[])
 	xlist* list = nullptr;
 	xlist_init(&list);
 
-	D3D12Mesh* mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	D3D12Mesh* mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.1f));
 	mesh->UpdateWorldMatrix(Matrix::CreateRotationY(DirectX::XM_PIDIV4) * Matrix::CreateTranslation(Vector3(0.0f, 0.2f, 0.0f)));
 	xlist_insert(list, mesh);
 
-	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.1f));
 	mesh->UpdateWorldMatrix(Matrix::CreateTranslation(Vector3(-0.5f, 0.0f, 0.0f)));
 	xlist_insert(list, mesh);
 
-	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.25f));
+	mesh = renderer->CreateMesh(GeometryGenerator::MakeBox(0.1f));
 	mesh->UpdateWorldMatrix(Matrix::CreateTranslation(Vector3(0.5f, 0.0f, 0.0f)));
 	xlist_insert(list, mesh);
 

@@ -23,6 +23,7 @@ struct Vertex
 {
 	Vector3 posModel = {};
 	Vector4 color = {};
+	Vector2 texCoord = {};
 };
 /*
 =======

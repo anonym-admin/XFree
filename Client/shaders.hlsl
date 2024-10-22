@@ -1,3 +1,7 @@
+Texture2D albedoTexture : register(t0);
+
+SamplerState linearClamp : register(s0);
+
 cbuffer ConstBuffer : register(b0)
 {
 	matrix world;
@@ -9,12 +13,14 @@ struct VSInput
 {
 	float3 posModel : POSITION;
 	float4 color : COLOR;
+	float2 texCoord : TEXCOORD;
 };
 
 struct PSInput
 {
 	float4 posProj : SV_POSITION;
 	float4 color : COLOR;
+	float2 texCoord : TEXCOORD;
 };
 
 PSInput VSMain(VSInput input)
@@ -29,13 +35,14 @@ PSInput VSMain(VSInput input)
 
 	output.posProj = pos;
 	output.color = input.color;
+	output.texCoord = input.texCoord;
 
 	return output;
 }
 
 float4 PSMain(PSInput input) : SV_Target0
 {
-	return input.color;
+	return albedoTexture.Sample(linearClamp, input.texCoord);
 }
 
 

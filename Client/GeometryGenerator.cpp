@@ -92,6 +92,10 @@ namespace GeometryGenerator
 		squareVertices[1].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 		squareVertices[2].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 		squareVertices[3].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+		squareVertices[0].texCoord	= Vector2(0.0f, 1.0f);
+		squareVertices[1].texCoord	= Vector2(0.0f, 0.0f);
+		squareVertices[2].texCoord	= Vector2(1.0f, 0.0f);
+		squareVertices[3].texCoord	= Vector2(1.0f, 1.0f);
 
 		squareVertices[4].posModel	= Vector3(-1.0f, -1.0f, -1.0f) * scale;
 		squareVertices[5].posModel	= Vector3(1.0f, -1.0f, -1.0f) * scale;
@@ -101,6 +105,10 @@ namespace GeometryGenerator
 		squareVertices[5].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 		squareVertices[6].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 		squareVertices[7].color		= Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+		squareVertices[4].texCoord	= Vector2(0.0f, 1.0f);
+		squareVertices[5].texCoord	= Vector2(0.0f, 0.0f);
+		squareVertices[6].texCoord	= Vector2(1.0f, 0.0f);
+		squareVertices[7].texCoord	= Vector2(1.0f, 1.0f);
 
 		squareVertices[8].posModel	= Vector3(-1.0f, -1.0f, -1.0f) * scale;
 		squareVertices[9].posModel	= Vector3(-1.0f, 1.0f, -1.0f) * scale;
@@ -110,6 +118,10 @@ namespace GeometryGenerator
 		squareVertices[9].color		= Vector4(0.0f, 0.0f, 1.0f, 1.0f);
 		squareVertices[10].color	= Vector4(0.0f, 0.0f, 1.0f, 1.0f);
 		squareVertices[11].color	= Vector4(0.0f, 0.0f, 1.0f, 1.0f);
+		squareVertices[8].texCoord  = Vector2(0.0f, 1.0f);
+		squareVertices[9].texCoord  = Vector2(0.0f, 0.0f);
+		squareVertices[10].texCoord = Vector2(1.0f, 0.0f);
+		squareVertices[11].texCoord = Vector2(1.0f, 1.0f);
 
 		squareVertices[12].posModel = Vector3(-1.0f, -1.0f, 1.0f) * scale;
 		squareVertices[13].posModel = Vector3(1.0f, -1.0f, 1.0f) * scale;
@@ -119,6 +131,10 @@ namespace GeometryGenerator
 		squareVertices[13].color	= Vector4(0.0f, 1.0f, 1.0f, 1.0f);
 		squareVertices[14].color	= Vector4(0.0f, 1.0f, 1.0f, 1.0f);
 		squareVertices[15].color	= Vector4(0.0f, 1.0f, 1.0f, 1.0f);
+		squareVertices[12].texCoord = Vector2(0.0f, 1.0f);
+		squareVertices[13].texCoord = Vector2(0.0f, 0.0f);
+		squareVertices[14].texCoord = Vector2(1.0f, 0.0f);
+		squareVertices[15].texCoord = Vector2(1.0f, 1.0f);
 
 		squareVertices[16].posModel = Vector3(-1.0f, -1.0f, 1.0f) * scale;
 		squareVertices[17].posModel = Vector3(-1.0f, 1.0f, 1.0f) * scale;
@@ -128,6 +144,10 @@ namespace GeometryGenerator
 		squareVertices[17].color	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
 		squareVertices[18].color	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
 		squareVertices[19].color	= Vector4(1.0f, 1.0f, 0.0f, 1.0f);
+		squareVertices[16].texCoord = Vector2(0.0f, 1.0f);
+		squareVertices[17].texCoord = Vector2(0.0f, 0.0f);
+		squareVertices[18].texCoord = Vector2(1.0f, 0.0f);
+		squareVertices[19].texCoord = Vector2(1.0f, 1.0f);
 
 		squareVertices[20].posModel = Vector3(1.0f, -1.0f, 1.0f) * scale;
 		squareVertices[21].posModel = Vector3(1.0f, -1.0f, -1.0f) * scale;
@@ -137,7 +157,10 @@ namespace GeometryGenerator
 		squareVertices[21].color	= Vector4(1.0f, 0.0f, 1.0f, 1.0f);
 		squareVertices[22].color	= Vector4(1.0f, 0.0f, 1.0f, 1.0f);
 		squareVertices[23].color	= Vector4(1.0f, 0.0f, 1.0f, 1.0f);
-
+		squareVertices[20].texCoord = Vector2(0.0f, 1.0f);
+		squareVertices[21].texCoord = Vector2(0.0f, 0.0f);
+		squareVertices[22].texCoord = Vector2(1.0f, 0.0f);
+		squareVertices[23].texCoord = Vector2(1.0f, 1.0f);
 
 		uint32 size = sizeof(squareVertices);
 		uint32 count = size / sizeof(Vertex);
